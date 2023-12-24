@@ -1,0 +1,7 @@
+package = package_name()
+
+sh_cmd(
+  name = "compose",
+  expand_env_vars = True,
+  cmd = f"docker-compose -f {package}/docker-compose.yml --project-name ${PROJECT} \\\$@"
+)

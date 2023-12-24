@@ -1,0 +1,26 @@
+subinclude("///pleasings//docker")
+
+package = package_name()
+
+docker_image(
+  name = "documentation",
+  srcs = glob(["*"], ["node_modules", "dist"]),
+  dockerfile = "Dockerfile",
+  visibility = ["//svc/documentation/..."]
+)
+
+sh_cmd(
+  name = "local",
+  srcs = glob(["src/**/*", "package*"], ["node_modules"]),
+  cmd = f"docker-compose -f {package}/docker-compose.yml --project-name $PROJECT \\\$@",
+)
+
+sh_cmd(
+  name = "lint",
+  cmd = "echo todo"
+)
+
+sh_cmd(
+  name = "test",
+  cmd = "echo todo"
+)

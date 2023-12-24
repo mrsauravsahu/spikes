@@ -1,0 +1,17 @@
+version: '3.1'
+
+networks:
+  "$PROJECT":
+
+services:
+  documentation:
+    build:
+      context: .
+      dockerfile: ../../common/docker/node-dev/dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION}
+    volumes:
+      - "$PWD/svc/documentation:/app"
+    ports:
+      - 8083:3000
+    entrypoint: bash -c 'npm i && npm run dev'

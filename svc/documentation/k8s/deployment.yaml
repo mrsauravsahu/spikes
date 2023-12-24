@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: template-monorepo
+  name: documentation
+  labels:
+    app: documentation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: documentation
+  template:
+    metadata:
+      labels:
+        app: documentation
+    spec:
+      containers:
+        - name: main
+          image: //svc/documentation:documentation
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+            requests:
+              cpu: 250m
+              memory: 128Mi
+          ports:
+            - containerPort: 3000
+          env:
+          - name: PORT
+            value: "3000"
