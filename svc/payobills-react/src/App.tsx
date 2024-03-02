@@ -1,20 +1,14 @@
-import { useEffect, useState } from 'react'
 import './App.css'
 
-import { Bill as BillComponent, type BillProp } from './components/Bill'
-import { getBills } from './apis/get-bills'
+import { Bill as BillComponent } from './components/Bill'
 import { ErrorSnack } from './components/ErrorSnack'
+import { useBills } from './hooks/use-bills'
 
 export default function App() {
-  const [bills, setBills] = useState<Array<BillProp>>([])
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getBills({ limit: 10, offset: 0 }, (err: any, bills: Array<BillProp>) => {
-      if (!err) setBills(bills)
-      setError(err)
-    })
-  }, [])
+  const [{
+    error,
+    bills
+  }] = useBills([])
 
   return (
     <>
