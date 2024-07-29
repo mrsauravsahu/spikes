@@ -1,0 +1,52 @@
+using Codeuctivity.ImageSharpCompare;
+using OpenQA.Selenium.Appium;
+using OpenQA.Selenium.Appium.Android;
+using OpenQA.Selenium.Appium.Enums;
+using OpenQA.Selenium.Remote;
+using SixLabors.ImageSharp;
+using FluentAssertions;
+
+namespace Template.Tests.Appium;
+
+public class ScreenshotTests : IDisposable
+{
+    private readonly AndroidDriver<AndroidElement> _driver;
+
+    public ScreenshotTests()
+    {
+        var appId = "com.templateapprn";
+
+
+        var driverOptions = new AppiumOptions();
+        driverOptions.AddAdditionalCapability(MobileCapabilityType.PlatformName, "Android");
+        driverOptions.AddAdditionalCapability("appium:automationName", "UiAutomator2");
+        driverOptions.AddAdditionalCapability(MobileCapabilityType.App, appId);
+        driverOptions.AddAdditionalCapability(MobileCapabilityType.DeviceName, "my_android_31");
+
+        _driver = new AndroidDriver<AndroidElement>(new Uri("http://localhost:4723"), driverOptions);
+        _driver.ActivateApp(appId);
+    }
+
+    public void Dispose() => _driver.Quit();
+
+    [Theory]
+    [InlineData("MainPage")]
+    public void Should_Match_Screenshot(string scenario)
+    {
+        var screenshotsPathPrefix = "/Users/mrsauravsahu/Downloads/mrsauravsahu/code/appium-cross-testing/Template.Tests.Appium/screenshots";
+        var expectedPath = $@"{screenshotsPathPrefix}/figma-designs/{scenario}--Android Large.png";
+        var actualPath = $@"{screenshotsPathPrefix}/{scenario}.png";
+        var diffPath = $@"{screenshotsPathPrefix}/diff/{scenario}.png";
+
+        // var photo = _driver.GetScreenshot();
+        // photo.SaveAsFile(actualPath);
+
+        using (var fileStreamDifferenceMask = File.Create(diffPath))
+        using (var maskImage = ImageSharpCompare.CalcDiffMaskImage(actualPath, expectedPath))
+        { ImageExtensions.SaveAsPng(maskImage, fileStreamDifferenceMask); }
+
+        var maskedDiff = ImageSharpCompare.CalcDiff(actualPath, expectedPath, diffPath);
+
+        maskedDiff.AbsoluteError.Should().Be(0);
+    }
+}
