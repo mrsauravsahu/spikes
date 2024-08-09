@@ -38,13 +38,15 @@ async fn search_databases(notion_api: NotionApi) {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Create a new NotionApi instance with your API key
-    let notion_token = std::env::var("NOTION_INTEGRATION_TOKEN").expect("NOTION_INTEGRATION_TOKEN must be set");
+    let notion_token = std::env::var("NOTION_INTEGRATION_TOKEN")
+        .expect("NOTION_INTEGRATION_TOKEN must be set");
 
     match NotionApi::new(notion_token) {
         Ok(notion_api) => {
-            tokio::runtime::Runtime::new().unwrap().block_on(search_databases(notion_api));
+            search_databases(notion_api).await
         },
         Err(e) => { eprintln!("Error creating NotionApi instance {:?}", e); }
     }
