@@ -1,45 +1,34 @@
-use notion::ids::{AsIdentifier, BlockId, DatabaseId};
+use notion::ids::{BlockId, DatabaseId};
+use notion::models::paging::Paging;
 use notion::NotionApi;
-use notion::models::search::{DatabaseQuery, FilterProperty, FilterValue, NotionSearch};
+use notion::models::search::{DatabaseQuery, FilterCondition, FilterProperty, FilterValue, NotionSearch, PropertyCondition, SelectCondition};
 use notion::models::{Block, ListResponse, Object, Page};
 use tokio;
 use std::str::FromStr; 
 
-async fn search_database_items(notion_api: NotionApi,) {
-    let db_id: DatabaseId = DatabaseId::from_str("9bd6d8e77ccb4a7c9296fb4382a0092a")
+async fn search_database_items(notion_api: NotionApi, db_id: String) {
+    let db_id: DatabaseId = DatabaseId::from_str(&db_id)
         .expect("Can't parse to DatabaseId");
 
     let db_query = DatabaseQuery {
         sorts: None,
-        filter: None,
-        paging: None
+        filter: Some(FilterCondition {
+            property: "SyncResult".to_string(),
+            condition: PropertyCondition::Select(SelectCondition::IsEmpty)
+        }),
+        paging: Some(Paging {
+            start_cursor: None,
+            page_size: Some(u8::from_str_radix("1", 10).expect("Invalid u8"))
+        })
     };
 
     match notion_api.query_database(db_id, db_query).await {
-        // Ok(ListResponse::<Block> { results: response, .. }) => {
-        //     println!("Finding Notion Pages");
-        //     for block in response {
-        //         let page_title = page.title().expect("cannot get page title");
-        //         println!("{:?}", page);
-        //         println!("{}", page_title);
-
-        //         let block = TryInto::<Block>::try_into(page);
-        //         // page.try_into::<Block>();
-        //         println!("{:?}", block);
-
-        //     }
-        // },
         Ok(ListResponse::<Page> { results: response, .. }) => {
             println!("Finding Notion Pages");
             for page in response {
                 println!("_____________");
                 let page_title = page.title().expect("cannot get page title");
-                // println!("{:?}", page);
                 println!("{}", page_title);
-
-                // let block = TryInto::<Block>::try_into(page);
-                // page.try_into::<Block>();
-                // println!("{:?}", block);
                 let block_id = BlockId::from(page.id);
 
                 let blocks = notion_api.get_block_children(block_id).await;
@@ -113,10 +102,13 @@ async fn main() {
     let notion_token = std::env::var("NOTION_INTEGRATION_TOKEN")
         .expect("NOTION_INTEGRATION_TOKEN must be set");
 
+    let db_id = std::env::var("NOTION_DB_ID")
+        .expect("NOTION_DB_ID must be set");
+
     match NotionApi::new(notion_token) {
         Ok(notion_api) => {
             // search_databases(notion_api).await
-            search_database_items(notion_api).await
+            search_database_items(notion_api, db_id).await
         },
         Err(e) => { eprintln!("Error creating NotionApi instance {:?}", e); }
     }
