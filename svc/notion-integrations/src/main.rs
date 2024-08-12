@@ -3,10 +3,33 @@ use notion::models::paging::Paging;
 use notion::NotionApi;
 use notion::models::search::{DatabaseQuery, FilterCondition, FilterProperty, FilterValue, NotionSearch, PropertyCondition, SelectCondition};
 use notion::models::{Block, ListResponse, Object, Page};
+use reqwest::header::HeaderMap;
 use tokio;
-use std::str::FromStr; 
+use std::str::FromStr;
+use serde_json::json;
 
-async fn search_database_items(notion_api: NotionApi, db_id: String) {
+async fn write_transaction_to_nocodb(token: &str, transaction: String) -> Result<(), Box<dyn std::error::Error>>  {
+    let mut map = HeaderMap::new();
+    map.insert("xc-token", token.parse().unwrap());
+
+    let client = reqwest::Client::new();
+
+    let body = json!({
+        "OriginalText": transaction
+    });
+
+    let resp = client.post("http://localhost:8080/api/v1/db/data/nc/payobills/transactions")
+    .headers(map)
+    .json(&body)
+    .send()
+    .await?;
+
+    println!("{resp:#?}");
+
+    Ok(())
+}
+
+async fn search_database_items(notion_api: NotionApi, db_id: String, nocodb_integration_token: &str) {
     let db_id: DatabaseId = DatabaseId::from_str(&db_id)
         .expect("Can't parse to DatabaseId");
 
@@ -44,6 +67,8 @@ async fn search_database_items(notion_api: NotionApi, db_id: String) {
                                     .join(" ");
 
                                 println!("{:?}", content);
+
+                                write_transaction_to_nocodb(nocodb_integration_token, content).await.expect("Unable to write to NocoDB")
                             }
                             _ => todo!()
                         }
@@ -105,10 +130,13 @@ async fn main() {
     let db_id = std::env::var("NOTION_DB_ID")
         .expect("NOTION_DB_ID must be set");
 
+    let nocodb_integration_token = std::env::var("NOCODB_INTEGRATION_TOKEN")
+        .expect("NOCODB_INTEGRATION_TOKEN must be set");
+
     match NotionApi::new(notion_token) {
         Ok(notion_api) => {
             // search_databases(notion_api).await
-            search_database_items(notion_api, db_id).await
+            search_database_items(notion_api, db_id, &nocodb_integration_token).await
         },
         Err(e) => { eprintln!("Error creating NotionApi instance {:?}", e); }
     }
