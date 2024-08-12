@@ -1,9 +1,9 @@
-use notion::ids::{BlockId, DatabaseId};
+use notion::ids::{BlockId, DatabaseId, PageId};
 use notion::models::paging::Paging;
 use notion::NotionApi;
 use notion::models::search::{DatabaseQuery, FilterCondition, FilterProperty, FilterValue, NotionSearch, PropertyCondition, SelectCondition};
 use notion::models::{Block, ListResponse, Object, Page};
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, HeaderValue};
 use tokio;
 use std::str::FromStr;
 use serde_json::json;
@@ -29,7 +29,40 @@ async fn write_transaction_to_nocodb(token: &str, transaction: String) -> Result
     Ok(())
 }
 
-async fn search_database_items(notion_api: NotionApi, db_id: String, nocodb_integration_token: &str) {
+async fn update_sync_result_in_notion(notion_token: &str, page_id: String) -> Result<(), Box<dyn std::error::Error>> {
+    
+    let mut map = HeaderMap::new();
+    map.insert(
+        "Authorization", 
+        HeaderValue::from_str(&format!("Bearer {0}", notion_token))?
+    );
+
+    map.insert(
+        "Notion-Version", 
+        "2022-06-28".parse().unwrap()
+    );
+
+    let client = reqwest::Client::new();
+
+    let body = json!({
+        "properties": {
+            "SyncResult": { "select": { "name": "SUCCESS" } }
+        }
+    });
+
+    let resp = client.patch(format!("https://api.notion.com/v1/pages/{0}", page_id))
+    .headers(map)
+    .json(&body)
+    .send()
+    .await?;
+
+    println!("{resp:#?}");
+
+    Ok(())
+    
+}
+
+async fn search_database_items(notion_api: NotionApi, db_id: String, notion_token: &str, nocodb_integration_token: &str) {
     let db_id: DatabaseId = DatabaseId::from_str(&db_id)
         .expect("Can't parse to DatabaseId");
 
@@ -52,7 +85,7 @@ async fn search_database_items(notion_api: NotionApi, db_id: String, nocodb_inte
                 println!("_____________");
                 let page_title = page.title().expect("cannot get page title");
                 println!("{}", page_title);
-                let block_id = BlockId::from(page.id);
+                let block_id = BlockId::from(page.id.clone());
 
                 let blocks = notion_api.get_block_children(block_id).await;
                 match blocks {
@@ -68,7 +101,15 @@ async fn search_database_items(notion_api: NotionApi, db_id: String, nocodb_inte
 
                                 println!("{:?}", content);
 
-                                write_transaction_to_nocodb(nocodb_integration_token, content).await.expect("Unable to write to NocoDB")
+                                let page_id = PageId::from(page.id.clone());
+
+                                write_transaction_to_nocodb(nocodb_integration_token, content)
+                                    .await
+                                    .expect("Unable to write to NocoDB");
+
+                                update_sync_result_in_notion(notion_token, page_id.clone().to_string())
+                                    .await
+                                    .expect("Unable to update Notion with SyncResult");
                             }
                             _ => todo!()
                         }
@@ -133,10 +174,10 @@ async fn main() {
     let nocodb_integration_token = std::env::var("NOCODB_INTEGRATION_TOKEN")
         .expect("NOCODB_INTEGRATION_TOKEN must be set");
 
-    match NotionApi::new(notion_token) {
+    match NotionApi::new(notion_token.clone()) {
         Ok(notion_api) => {
             // search_databases(notion_api).await
-            search_database_items(notion_api, db_id, &nocodb_integration_token).await
+            search_database_items(notion_api, db_id, &notion_token.clone(), &nocodb_integration_token).await
         },
         Err(e) => { eprintln!("Error creating NotionApi instance {:?}", e); }
     }
